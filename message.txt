@@ -1,0 +1,102 @@
+import numpy as np
+import pickle
+import os
+import random
+
+agentName = "Oscars RL Agent"
+save_filename = "trained_agent.pkl"
+
+training = [("random_agent.py", "value_agent.py", 1000000),
+            ("valueplus_agent.py", "value_agent.py", 1000000),
+            ("valueplus_agent.py", "random_agent.py", 1000000)
+            ]
+
+class RajAgent():
+    def __init__(self, item_values, card_values):
+        self.item_values = item_values
+        self.card_values = card_values
+        self.Q = {}  # Q-table
+        self.alpha = 0.5  # Learning rate
+        self.gamma = 0.95  # Discount factor
+        self.epsilon = 0.2  # Exploration rate
+        self.previous_state = None
+        self.previous_action = 0
+        self.previous_bank = 0
+    
+    def load(self, filename):
+        print(f'Loading trained {agentName} agent from {filename}...')
+        with open(filename, 'rb') as f:
+            tmp_dict = pickle.load(f)
+        self.__dict__.update(tmp_dict)
+
+    def save(self, filename):
+        print(f'Saving trained {agentName} agent to {filename}...')
+        with open(filename, 'wb') as f:
+            pickle.dump(self.__dict__, f)
+    
+    def train_start(self):
+        self.Q = {}  # Reset the Q-table at the start of training
+        self.alpha = 0.5
+        self.gamma = 0.95
+        self.epsilon = 0.2
+    
+    def train_end(self):
+        print("Training finished")
+        print(self.Q)
+    
+    def train_game_start(self):
+        self.previous_state = None
+        self.previous_action = 0
+        self.previous_bank = 0  # Reset bank at the start of each game
+
+    def train_game_end(self, banks):
+        """ Update the Q-table when the game ends based on the final bank balances. """
+        # Calculate reward for the last action if there was a previous state
+        # Reset state and bank for the next game
+        
+
+        self.previous_state = None
+        self.previous_action = 0
+        self.previous_bank = 0
+
+    def AgentFunction(self, percepts):
+        # Extract percepts
+        bidding_on = percepts[0]            # The item being bid on
+        my_cards = percepts[2]              # Cards available to the agent
+        bank = percepts[3]                  # Current bank of the agent
+        opponents_cards = percepts[4:]
+
+        # Represent the current state as a tuple of relevant percepts
+        current_state = (tuple(my_cards), bidding_on, opponents_cards, bank)
+
+        # If the state is not in the Q-table, initialize the Q-values for this state
+        if current_state not in self.Q:
+            self.Q[current_state] = np.zeros(len(my_cards))
+
+        # Calculate reward based on bank change
+        reward = 1 if bank > self.previous_bank else -1
+
+        # Update Q-value for the previous action, only if the previous state exists
+        if hasattr(self, 'previous_action') and hasattr(self, 'previous_state'):
+            # Ensure previous_state exists in Q-table
+            if self.previous_state not in self.Q:
+                self.Q[self.previous_state] = np.zeros(len(my_cards))  # Initialize if missing
+            # print(self.Q[self.previous_state][self.previous_action])
+            # Q-learning update rule
+            self.Q[self.previous_state][self.previous_action] += self.alpha * (
+                reward + self.gamma * np.max(self.Q[current_state]) - self.Q[self.previous_state][self.previous_action]
+            )
+
+        if random.uniform(0, 1) < self.epsilon:
+            # Explore: Choose a random action
+            action = random.choice(range(len(my_cards)))
+        else:
+            # Exploit: Choose the action with the highest Q-value
+            action = np.argmax(self.Q[current_state])
+
+        # Store the current state and action to update after the next round
+        self.previous_state = current_state
+        self.previous_action = action
+        self.previous_bank = bank
+
+        return my_cards[action]  # Return the chosen card to play`
